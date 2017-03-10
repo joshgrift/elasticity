@@ -1,0 +1,50 @@
+html {
+	width: 100% !important;
+}
+
+body {
+	width: 96% !important;
+	padding: 1% !important;
+	margin: 0px !important;
+}
+
+footer {
+	text-align: center;
+	width: 100%;
+	clear: both;
+}
+
+input {
+	width: 100%;
+}
+
+th {
+	text-align: center;
+	width: 15%;
+}
+
+.tr {
+	background-color: rgb(228, 255, 226);
+}
+
+.e {
+	background-color: rgb(232, 242, 255);
+}
+
+th.d {
+	background-color: rgb(221, 221, 221);
+}
+
+.money {}
+
+.elastic {
+	background-color: rgb(204, 227, 209);
+}
+
+.inelastic {
+	background-color: rgb(227, 204, 204);
+}
+
+.unitary {
+	background-color: rgb(204, 213, 227);
+}
