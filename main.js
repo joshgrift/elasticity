@@ -1,5 +1,6 @@
 var rows = 10;
 var data = new Array();
+var calculator;
 
 window.onload = function(){
   getData();
@@ -8,12 +9,28 @@ window.onload = function(){
   $('.results').html("");
 
   for(var i = 0; i < data.length; i++){
-    $('.results').append("<tr class='row_" + i + "'><td><input placeholder='$' class='p money' value='" + data[i].P + "'></input></td><td><input class='p' value='" + data[i].Qs + "'></input></td><td><input class='p' value='" + data[i].Qd + "'></input></td><td class='e es'>" + data[i].Es + "</td><td class='e ed'>" + data[i].Ed + "</td><td class='tr'>" + data[i].Tr + "</td></tr>");
+    $('.results').append("<tr class='row_" + i + "'><td><input placeholder='$' class='p money' value='" + data[i].P + "'></input></td><td class='qs'><input class='p' value='" + data[i].Qs + "'></input></td><td class='qd'><input class='p' value='" + data[i].Qd + "'></input></td><td class='e es'>" + data[i].Es + "</td><td class='e ed'>" + data[i].Ed + "</td><td class='tr'>" + data[i].Tr + "</td></tr>");
   }
+
+  //graph
+  calculator = Desmos.GraphingCalculator($('#calculator')[0],{zoomButtons:false,expressions:false,lockViewport:true,settingsMenu:false});
+
+  calculator.updateSettings({yAxisLabel:'Price',xAxisLabel:'Qs/Qd'})
+
+  calculator.setMathBounds({
+    left: 0,
+    bottom: 0,
+    right: 10,
+    top: 10
+  });
+
+  graph();
 }
 
 window.onkeyup = function(){
   getData();
+
+  graph();
 }
 
 function getData(){
@@ -33,9 +50,9 @@ function getData(){
 
   for(var e = TableData.length; e <= rows; e++){
     TableData[e]={
-        "P" : ""
-        , "Qs" : ""
-        , "Qd" : ""
+        "P" : ""//Math.round(((1 - (e/10))*10))/10
+        , "Qs" : ""//((10*2) - e*2) * 10
+        , "Qd" : ""//(e*2) * 20
         , "Es" : ""
         , "Ed" : ""
         , "Tr" : ""
@@ -101,9 +118,172 @@ function display(){
       $('.row_' + i + ' .ed').addClass('unitary');
     }
 
-
     $('.row_' + i + ' .es').html(data[i].Es);
     $('.row_' + i + ' .ed').html(data[i].Ed);
     $('.row_' + i + ' .tr').html("$" + data[i].Tr);
   }
 }
+
+function graph(){
+  //set values
+  var p = new Array();
+  var Qd = new Array();
+  var Qs = new Array();
+
+  for(var i = 0; i < data.length; i++){
+    Qd[i] = parseFloat(data[i].Qd);
+    Qs[i] = parseFloat(data[i].Qs);
+    p[i] = parseFloat(data[i].P);
+  }
+
+  p.clean();
+  Qd.clean();
+  Qs.clean();
+
+  calculator.setMathBounds({
+    left: 0,
+    bottom: 0,
+    right: Math.max(max(Qs),max(Qd)),
+    top: max(p)
+  });
+
+  /* demand */
+  calculator.setExpression({
+    id: 'table1',
+    type: 'table',
+    columns: [
+      { /* Qd */
+        latex: 'x',
+        values: Qd
+      },
+      { /* P */
+        latex: 'y',
+        values: p,
+        color: Desmos.Colors.PURPLE
+      },
+      { /* Demand Curve */
+        latex: lineOfBestFit(Qd,p),
+        color: Desmos.Colors.PURPLE,
+        columnMode: Desmos.ColumnModes.LINES
+      }
+    ]
+  });
+
+  /* supply */
+  calculator.setExpression({
+    id: 'table2',
+    type: 'table',
+    columns: [
+      { /* Qs */
+        latex: 'x',
+        values: Qs
+      },
+      { /* P */
+        latex: 'y',
+        values: p,
+        color: Desmos.Colors.RED
+      },
+      { /* Supply Curve */
+        latex: lineOfBestFit(Qs,p),
+        color: Desmos.Colors.RED,
+        columnMode: Desmos.ColumnModes.LINES
+      }
+    ]
+  });
+
+  /* equlibrium */
+  var eq = equlibrium(p,Qd,Qs);
+
+  calculator.setExpression({
+    id: 'equlibrium',
+    type: 'table',
+    columns: [
+      {
+        latex: 'x',
+        values: [parseFloat(eq.x)]
+      },
+      {
+        latex: 'y',
+        values: [parseFloat(eq.y)],
+        color: Desmos.Colors.BLUE
+      }
+    ]
+  });
+}
+
+function max(array){
+  var max = 0;
+  for(var i = 0; i < array.length; i++){
+    if(array[max] < array[i]){
+      max = i;
+    }
+  }
+
+  return array[max];
+}
+
+function bestfit(values_x, values_y) {
+  var sum_x = 0;
+  var sum_y = 0;
+  var sum_xy = 0;
+  var sum_xx = 0;
+  var count = 0;
+
+  /*
+   * We'll use those variables for faster read/write access.
+   */
+  var x = 0;
+  var y = 0;
+  var values_length = values_x.length;
+
+  /*
+   * Calculate the sum for each of the parts necessary.
+   */
+  for (var v = 0; v < values_length; v++) {
+      x = values_x[v];
+      y = values_y[v];
+      sum_x += x;
+      sum_y += y;
+      sum_xx += x*x;
+      sum_xy += x*y;
+      count++;
+  }
+
+  /*
+   * Calculate m and b for the formular:
+   * y = x * m + b
+   */
+  var m = (count*sum_xy - sum_x*sum_y) / (count*sum_xx - sum_x*sum_x);
+  var b = (sum_y/count) - (m*sum_x)/count;
+
+  return {m:m,b:b};
+}
+
+function lineOfBestFit(a,b){
+  var obj = bestfit(a,b);
+
+  return "x*" + obj.m + "+" + obj.b;
+}
+
+function equlibrium(x_values,y1_values,y2_values){
+  var func = bestfit(x_values,y1_values);
+  var func2 = bestfit(x_values,y2_values);
+  var x = 0;
+  var y = 0;
+  var found = false;
+
+  y = (func2.b-func.b)/(func.m - func2.m);
+  x = y * func.m + func.b;
+
+  return {x:x,y:y};
+}
+
+Array.prototype.clean = function(deleteValue) {
+  for (var i = 0; i < this.length; i++) {
+    if (!this[i]) {
+      this.splice(i, 1);
+      i--;
+    }
+  }
+  return this;
+};
