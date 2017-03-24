@@ -1,16 +1,21 @@
 var rows = 10;
 var data = new Array();
 var calculator;
+var savedGraph1 = "";
+var savedGraph2 = "";
+var selectedOption = "Qs";
+
+/*
+ getData() - gets data from table or create empty table
+ render() - create table with data
+ calculate() - determine results
+ display() - inserts data
+ graph() - create graph
+*/
 
 window.onload = function(){
   getData();
-
-  //display the first time
-  $('.results').html("");
-
-  for(var i = 0; i < data.length; i++){
-    $('.results').append("<tr class='row_" + i + "'><td><input placeholder='$' class='p money' value='" + data[i].P + "'></input></td><td class='qs'><input class='p' value='" + data[i].Qs + "'></input></td><td class='qd'><input class='p' value='" + data[i].Qd + "'></input></td><td class='e es'>" + data[i].Es + "</td><td class='e ed'>" + data[i].Ed + "</td><td class='tr'>" + data[i].Tr + "</td></tr>");
-  }
+  render();
 
   //graph
   calculator = Desmos.GraphingCalculator($('#calculator')[0],{zoomButtons:false,expressions:false,lockViewport:true,settingsMenu:false});
@@ -25,12 +30,32 @@ window.onload = function(){
   });
 
   graph();
+
+  if(window.location.hash){
+    console.log(window.location.hash);
+
+    data = JSON.parse(window.location.hash.replace('#',''));
+
+    render();
+    display();
+    graph();
+  }
 }
 
 window.onkeyup = function(){
   getData();
-
+  calculate();
+  display();
   graph();
+}
+
+function render(){
+  //display the first time
+  $('.results').html("");
+
+  for(var i = 0; i < data.length; i++){
+    $('.results').append("<tr class='row_" + i + "'><td><input placeholder='$' class='p money' value='" + data[i].P + "'></input></td><td class='qs'><input class='p' value='" + data[i].Qs + "'></input></td><td class='qd'><input class='p' value='" + data[i].Qd + "'></input></td><td class='e es'>" + data[i].Es + "</td><td class='e ed'>" + data[i].Ed + "</td><td class='tr'>" + data[i].Tr + "</td></tr>");
+  }
 }
 
 function getData(){
@@ -59,12 +84,8 @@ function getData(){
     }
   }
 
-  //calculating
+  //save data
   data = TableData;
-  calculate();
-
-  //display
-  display();
 }
 
 function calculate(){
@@ -85,6 +106,9 @@ function calculate(){
         data[i].Ed = Math.abs(((data[i].Qd - data[i-1].Qd)/((data[i].Qd + data[i-1].Qd)/2))/((data[i].P - data[i-1].P)/((data[i].P + data[i-1].P)/2))).toFixed(2);
     }
 
+    if(data[i].P == 'NaN' || data[i].P == 0){ data[i].P = ""; }
+    if(data[i].Qs == 'NaN' || data[i].Qs == 0){ data[i].Qs = ""; }
+    if(data[i].Qd == 'NaN' || data[i].Qd == 0){ data[i].Qd = ""; }
     if(data[i].Ed == 'NaN' || data[i].Ed == 0){ data[i].Ed = ""; }
     if(data[i].Es == 'NaN' || data[i].Es == 0){ data[i].Es = ""; }
     if(data[i].Tr == 'NaN' || data[i].Tr == 0){ data[i].Tr = ""; }
@@ -124,6 +148,48 @@ function display(){
   }
 }
 
+/******************** end mains *********************/
+
+function importData(){
+  data = JSON.parse($('#import').val());
+
+  render();
+  display();
+  graph();
+}
+
+function exportData(){
+  var value = JSON.stringify(data);
+  while(value.indexOf('null') > 0){
+    value = value.replace('null','\"\"');
+  }
+  $('#export').val(value);
+}
+
+function adjust(value,thing){
+  if(value.indexOf('%')){
+    value = value.replace('%','\"\"');
+    percentage = true;
+  }
+
+  value = parseFloat(value);
+
+  for(var i = 0; i < data.length; i++){
+    if(data[i][thing]){
+      data[i][thing] = data[i][thing] = data[i][thing] + (data[i][thing] * value/100);
+    }
+
+    if(!data[i].P) { data[i].P = ""; }
+    if(!data[i].Qs){ data[i].Qs = ""; }
+    if(!data[i].Qd){ data[i].Qd = ""; }
+  }
+
+  render();
+  calculate();
+  graph();
+  display();
+}
+
 function graph(){
   //set values
   var p = new Array();
@@ -145,6 +211,15 @@ function graph(){
     bottom: 0,
     right: Math.max(max(Qs),max(Qd)),
     top: max(p)
+  });
+
+  /* saved graph */
+  calculator.setExpression({
+    id: 'graph1',latex:savedGraph1, color: '#eec7b6'
+  });
+
+  calculator.setExpression({
+    id: 'graph2',latex:savedGraph2, color: '#f9e7ff'
   });
 
   /* demand */
@@ -211,6 +286,26 @@ function graph(){
   });
 }
 
+function save(){
+  //set values
+  var p = new Array();
+  var Qd = new Array();
+  var Qs = new Array();
+
+  for(var i = 0; i < data.length; i++){
+    Qd[i] = parseFloat(data[i].Qd);
+    Qs[i] = parseFloat(data[i].Qs);
+    p[i] = parseFloat(data[i].P);
+  }
+
+  p.clean();
+  Qd.clean();
+  Qs.clean();
+
+  savedGraph1 = lineOfBestFit(Qs,p);
+  savedGraph2 = lineOfBestFit(Qd,p);
+}
+
 function max(array){
   var max = 0;
   for(var i = 0; i < array.length; i++){
@@ -256,6 +351,12 @@ function bestfit(values_x, values_y) {
   var m = (count*sum_xy - sum_x*sum_y) / (count*sum_xx - sum_x*sum_x);
   var b = (sum_y/count) - (m*sum_x)/count;
 
+  if(b < 0){
+
+    b = 0;
+    console.log(values_y[0] + ";" + b + "," + m);
+  }
+
   return {m:m,b:b};
 }
 
@@ -278,6 +379,7 @@ function equlibrium(x_values,y1_values,y2_values){
   return {x:x,y:y};
 }
 
+/* clears all 'false' values */
 Array.prototype.clean = function(deleteValue) {
   for (var i = 0; i < this.length; i++) {
     if (!this[i]) {
